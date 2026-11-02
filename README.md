@@ -31,9 +31,19 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
 
 ## 安装
 
+> profile 名按你的入口选：桌面版 GUI 启动的是 `desktop` profile，`dsh web` / 浏览器版用的是 `web` profile。
+
+**方式一：从 GitHub 直接装（推荐）**
+
 ```powershell
-# profile 名按你的入口选：桌面版 GUI 用 desktop，`dsh web`/浏览器版用 web
-dsh plugin --profile desktop add <本仓库的绝对路径>
+dsh plugin --profile desktop add github:Mabinogi-Cichol/dsh-progress-beat
+```
+
+**方式二：本地克隆后装**
+
+```powershell
+git clone git@github.com:Mabinogi-Cichol/dsh-progress-beat.git
+dsh plugin --profile desktop add <克隆目录的绝对路径>
 ```
 
 装完确认 profile 的 `package.json` 里 `dsh.profile.bundles` 含 `dsh-progress-beat`。运行中的 loader 会热加载新增条目；若 UI 的「插件列表」没刷新，切走再切回该标签页（它只在挂载时拉一次快照）。
@@ -43,7 +53,7 @@ dsh plugin --profile desktop add <本仓库的绝对路径>
 ## 卸载
 
 ```powershell
-dsh plugin --profile web remove dsh-progress-beat
+dsh plugin --profile desktop remove dsh-progress-beat
 # 并从 profile package.json 的 dsh.profile.bundles 中删掉同名条目
 ```
 

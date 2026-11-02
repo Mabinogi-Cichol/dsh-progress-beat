@@ -12,6 +12,15 @@
     "narration"
   ],
   "license": "MIT",
+  "author": "Mabinogi-Cichol",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Mabinogi-Cichol/dsh-progress-beat.git"
+  },
+  "homepage": "https://github.com/Mabinogi-Cichol/dsh-progress-beat#readme",
+  "bugs": {
+    "url": "https://github.com/Mabinogi-Cichol/dsh-progress-beat/issues"
+  },
   "type": "module",
   "main": "lib/index.js",
   "exports": {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { apply, name, inject } from 'file:///C:/Users/wqj78/.dsh/local-plugins/dsh-progress-beat/lib/index.js'
+import { apply, name, inject } from '../lib/index.js'
 
 const sections = []
 const handlers = {}
