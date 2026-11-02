@@ -1,0 +1,14 @@
+# dsh-progress-beat bundle patch：向 profile 插入插件配置项。
+# inject 声明 systemPrompt 服务依赖：cordis 会等待服务就绪后再 apply，
+# 避免 section 注册在服务未就绪时被静默降级（注入失效）。
+- insert:
+    - id: dsh-progress-beat
+      name: 'dsh-progress-beat'
+      inject: [systemPrompt]
+      config:
+        # 累计多少次工具调用后，强制提醒模型先播报一句进度
+        every: 4
+        # 单轮内最多注入多少次提醒（防止刷屏 / 刷 token）
+        maxRemindersPerTurn: 12
+        # 是否注册 system prompt 规则（建议保持 true，否则只剩注入提醒）
+        injectPrompt: true
