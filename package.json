@@ -49,6 +49,9 @@
       ]
     }
   },
+  "peerDependencies": {
+    "@deepseek-ai/schemastery": "^3.18.5"
+  },
   "engines": {
     "node": ">=22.19"
   }
