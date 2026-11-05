@@ -15,7 +15,28 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
 
 两条都不改会话内容、不吞工具结果、不阻塞调用：注入的 notice 走 `source.form = 'notice'`，模型可见、带归属、可审计。
 
+## 控制面板
+
+插件列表里 `dsh-progress-beat` 这一行会多出一个**配置**入口，打开就是可视化表单，不用手改 YAML：
+
+| 控件 | 字段 | 说明 |
+|---|---|---|
+| 节奏预设 | `every` | 一键切换 安静 8 / 标准 4 / 密集 2 |
+| 播报步频 | `every` | 累计多少次工具调用后强制播报（2–50） |
+| 单轮提醒上限 | `maxRemindersPerTurn` | 每个清零周期内最多注入多少条兜底提醒；0 表示关掉兜底 |
+| 常驻进度规则 | `injectPrompt` | 是否注册 system prompt 规则 |
+| 常驻规则文本 | `promptText` | 支持 `{{every}}` 占位符 |
+| 兜底提醒文本 | `nudgeText` | 支持 `{{every}}` / `{{count}}` 占位符 |
+
+面板是「暂存 + 保存」模型：改动先留在表单里，点**保存**才写入；每个字段可单独**重置**回默认，也可以**全部重置**。字段旁出现「已覆盖」徽标表示它被用户改过、不再跟随默认值。
+
+保存走宿主的 settings 服务，写进 profile 的 `cordis.patch.yml` 并由 Loader 热应用——面板保存即生效，重启后仍然有效。插件侧的 `Config` schema 是这一切的依据：宿主把它投影成表单（`ctx.configForms`），面板只负责渲染与暂存，不自建存储。
+
+> 面板注册在插件管理页的 `plugins.row.config` 插槽，键为 `dsh-progress-beat#dsh-progress-beat`。浏览器半侧随 Loader 行走，关掉这一行面板也随之消失。
+
 ## 配置
+
+控制面板改的就是下面这份 Config；也可以直接在 profile patch 里写：
 
 ```yaml
 - insert:
@@ -46,9 +67,18 @@ git clone git@github.com:Mabinogi-Cichol/dsh-progress-beat.git
 dsh plugin --profile desktop add <克隆目录的绝对路径>
 ```
 
-装完确认 profile 的 `package.json` 里 `dsh.profile.bundles` 含 `dsh-progress-beat`。运行中的 loader 会热加载新增条目；若 UI 的「插件列表」没刷新，切走再切回该标签页（它只在挂载时拉一次快照）。
+装完确认 profile 的 `package.json` 里 `dsh.profile.bundles` 含 `dsh-progress-beat`。运行中的 loader 会热加载新增条目；若 UI 的「插件列表」没刷新，切走再切回该标签页（它只在挂载时拉一次快照），或刷新页面让浏览器半侧重新入图。
 
 > 注意：桌面版 GUI 启动的是 `desktop` profile（`%USERPROFILE%\.dsh\profiles\desktop`），`dsh web` 用的是 `web` profile。装错 profile 时插件在界面上完全不可见——「插件列表」是 cordis loader 条目的只读投影。
+
+**依赖解析**：Host 半侧 import `@deepseek-ai/schemastery`（Config schema 需要可投影的 schema 对象）。以 `link:` 方式安装时，Node 从仓库目录向上解析，因此本机需要一个指向 DSH 安装的 `node_modules`：
+
+```powershell
+$target = "<DSH>\resources\app\dsh\node_modules\@deepseek-ai"
+New-Item -ItemType Junction -Path .\node_modules\@deepseek-ai -Target $target
+```
+
+`node_modules/` 已在 `.gitignore` 内。缺少这一步时插件加载失败、进度播报整体不生效，而不仅是面板。
 
 ## 卸载
 
@@ -60,10 +90,13 @@ dsh plugin --profile desktop remove dsh-progress-beat
 ## 自测
 
 ```powershell
-node test\smoke.mjs
+node test\smoke.mjs          # Host：注入节奏、配额、block 透传、轮次清零
+node test\panel-smoke.mjs    # Client：注册键、注入面、summary/page 两视图
 ```
 
-覆盖：section 注册与占位符替换、注入节奏、单轮配额、`block` 分支透传、无 agent 直连调用不计数、新用户提示词清零、关闭 prompt 注入。
+`smoke.mjs` 覆盖：section 注册与占位符替换、注入节奏、单轮配额、`block` 分支透传、无 agent 直连调用不计数、新用户提示词清零、关闭 prompt 注入。
+
+`panel-smoke.mjs` 用 mock 的 ModuleLoader 与 React 执行浏览器半侧，覆盖：factory 能被 `load()` 接收、`apply` 不抛错、面板注册到 `plugins.row.config` 且键为 `<包名>#<行 id>`、注入面含表单控制器、五个字段与保存控件都被渲染。
 
 ## 限制
 
