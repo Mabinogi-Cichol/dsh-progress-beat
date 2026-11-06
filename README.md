@@ -8,13 +8,13 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
 
 本插件用三条互补的机制把进度说话重新塞回执行过程：
 
-| 机制 | 挂载位置 | 作用 | 默认 |
-|---|---|---|---|
-| 进度规则 | `ctx.systemPrompt.section()`（order 4） | 每次请求都带上的常驻规则：预计多次调用时先说计划；进入新阶段时先说 1–2 句进度再继续。 | 开 |
-| 用户轮提醒 | `agent/pre-step` → 该轮 `messages` | 每条用户输入时，随这一轮的消息注入一条提醒。 | 关 |
-| 工具调用提醒 | `tools/post-execute` → `additionalContexts` | 按工具调用次数计数，每 N 次注入一条。模型想沉默也会被硬提醒一次。 | 关 |
+| 机制 | 挂载位置 | 作用 | 默认 | 节奏 |
+|---|---|---|---|---|
+| 常驻进度规则 | `ctx.systemPrompt.section()` | 每次请求都带上的常驻规则：预计多次调用时先说计划；进入新阶段或长时间没说明时先播报。 | 开 | `promptEvery`（文案里「每约 N 次」的 N）+ `sectionOrder`（插入位置，默认 4） |
+| 用户轮提醒 | `agent/pre-step` → 该轮 `messages` | 按轮次注入一条提醒，提醒模型本轮边做边说。 | 关 | `nudgeEveryTurns`（每 N 轮一次，默认 1） |
+| 沉默提醒 | `agent/pre-step` → 追加 notice | **按沉默算，不按调用总数算**：自上次播报以来累计 N 次调用、或沉默超过 T 秒，先到先算。 | 开 | `every`（默认 8 次）+ `silentSeconds`（默认 180 秒）+ `minGapSeconds` / `maxRemindersPerTurn` / `dripSeconds` |
 
-默认只保留进度规则：两路注入都关闭时，插件只贡献一个 system prompt section，连 `agent/pre-step` 钩子都不注册。打开用户轮提醒后，每个 turn 在入口 step 注入一条（同一轮的后续 step 不重复）；打开工具调用提醒后，另外按次数注入。
+默认开启的是**常驻规则 + 沉默提醒**：前者是每请求一段静态规则，后者只在模型真的沉默时才注入（200 次调用的实测是 6 条）。用户轮提醒默认关闭，打开后按 `nudgeEveryTurns` 的节奏在该轮入口 step 注入一条（默认每轮一次，同一轮的后续 step 不重复）。三路都关时插件只贡献一个 system prompt section，连 `agent/pre-step` 钩子都不注册。
 
 三条都不改会话内容、不吞工具结果、不阻塞调用：注入的 notice 走 `source.form = 'notice'`，模型可见、带归属、可审计。
 
@@ -22,21 +22,25 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
 
 插件列表里 `dsh-progress-beat` 这一行会多出一个**配置**入口，打开就是可视化表单，不用手改 YAML：
 
-| 控件 | 字段 | 说明 |
+面板按**三个机制**分成三个可折叠分组，折叠态只留机制名与开关，展开才露出该机制的细项：
+| 分组（开关字段） | 组内控件 | 说明 |
 |---|---|---|
-| 随用户输入提醒 | `nudgeOnUserTurn` | 每条用户输入时注入一条提醒（默认关） |
-| 用户轮提醒文本 | `userTurnText` | 随用户输入注入的文本，支持 `{{every}}` |
-| 按工具调用注入 | `nudgeOnToolCalls` | 额外按调用次数注入（默认关） |
-| 节奏预设 | `every` | 一键切换 安静 8 / 标准 4 / 密集 2 |
-| 播报步频 | `every` | 每多少次工具调用注入一条（2–50，仅上面开关开启时生效） |
-| 单轮提醒上限 | `maxRemindersPerTurn` | 每个计数周期内最多注入多少条；0 表示关掉这一路 |
-| 常驻进度规则 | `injectPrompt` | 是否注册 system prompt 规则 |
-| 常驻规则文本 | `promptText` | 支持 `{{every}}` 占位符 |
-| 工具调用提醒文本 | `nudgeText` | 支持 `{{every}}` / `{{count}}` 占位符 |
-
+| **常驻进度规则**<br>`injectPrompt` | `promptText` | 规则文本，支持 `{{every}}` |
+| | `promptEvery` | 规则文本里「每累计约 N 次」的 N（2–50，默认 6） |
+| | `sectionOrder` | `systemPrompt.section()` 的排序号（默认 4：人设 0、其它插件指令 2、工具声明 100 起） |
+| **用户轮提醒**<br>`nudgeOnUserTurn` | `userTurnText` | 随用户输入注入的文本，支持 `{{every}}` |
+| | `nudgeEveryTurns` | 每几轮提醒一次：1 表示每轮，3 表示每三轮（1–20） |
+| **沉默提醒**（默认开）<br>`nudgeOnToolCalls` | 节奏预设 | 安静 12 / 标准 8 / 密集 4（同时填 `every` 与 `promptEvery`） |
+| | `every` | 沉默调用阈值：自上次播报以来累计多少次调用触发（2–100，默认 8） |
+| | `silentSeconds` | 沉默时间阈值（秒）：超过这么久没播报也提醒（默认 180） |
+| | `maxRemindersPerTurn` | 每轮提醒预算；0 表示关掉这一路，非 0 时预算用尽后会降级成慢速提醒 |
+| | `nudgeText` | 命中阈值时注入的文本，支持 `{{count}}` / `{{seconds}}` / `{{every}}` / `{{remind}}` |
+| | 高级：`minGapSeconds` / `dripSeconds` | 两条提醒的最小间隔（默认 60 秒）／预算用尽后的慢速间隔（默认 300 秒） |
 面板是「暂存 + 保存」模型：改动先留在表单里，点**保存**才写入；每个字段可单独**重置**回默认，也可以**全部重置**。字段旁出现「已覆盖」徽标表示它被用户改过、不再跟随默认值。
 
 保存走宿主的 settings 服务，写进 profile 的 `cordis.patch.yml` 并由 Loader 热应用——面板保存即生效，重启后仍然有效。插件侧的 `Config` schema 是这一切的依据：宿主把它投影成表单（`ctx.configForms`），面板只负责渲染与暂存，不自建存储。
+
+> Config 里每个字段都声明了 `.volatile()`：宿主只把 volatile 字段投影成可编辑表单，漏掉时该命名空间根本不会出现在表单列表里，写入会被拒绝（面板上表现为「宿主没有接受这次写入」）。volatile 的变更由 Loader 就地推进运行中的引用，不会重跑插件的 `apply`，所以插件自己监听 `loader/volatile-update` 重建 system prompt 规则与钩子——保存后面板提示的「已热应用」指的就是这一步。
 
 > 面板注册在插件管理页的 `plugins.row.config` 插槽，键为 `dsh-progress-beat#dsh-progress-beat`。浏览器半侧随 Loader 行走，关掉这一行面板也随之消失。
 
@@ -50,12 +54,21 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
       name: 'dsh-progress-beat'
       inject: [systemPrompt]
       config:
-        nudgeOnUserTurn: false      # 每条用户输入时注入一条提醒（默认关）
-        nudgeOnToolCalls: false     # 额外按工具调用次数注入（默认关）
-        every: 4                    # nudgeOnToolCalls 开启时，每多少次调用注入一条
-        maxRemindersPerTurn: 12     # 每个计数周期最多注入多少条，0 表示关掉这一路
-        injectPrompt: true          # 是否注册 system prompt 规则
-        # promptText / userTurnText / nudgeText 可整段替换，支持 {{every}} / {{count}} 占位
+        # ① 常驻进度规则（system prompt section）
+        injectPrompt: true        # 是否注册常驻规则
+        promptEvery: 6            # 规则文本里「每累计约 N 次」的 N（2–50）
+        sectionOrder: 4           # section 排序号（0–99，默认 4，工具声明在 100 起）
+        # ② 用户轮提醒（agent/pre-step）
+        nudgeOnUserTurn: false    # 是否随用户输入注入（默认关）
+        nudgeEveryTurns: 1        # 每几轮提醒一次：1 每轮，3 每三轮（1–20）
+        # ③ 沉默提醒（agent/pre-step，按沉默而非调用总数）
+        nudgeOnToolCalls: true    # 是否开启（默认开）
+        every: 8                  # 沉默调用阈值：自上次播报以来累计多少次调用（2–100）
+        silentSeconds: 180        # 沉默时间阈值（秒），与调用次数先到先算
+        maxRemindersPerTurn: 6    # 每轮预算；0 表示关掉这一路
+        minGapSeconds: 60         # 两条提醒之间的最小间隔（秒）
+        dripSeconds: 300          # 预算用尽后的慢速提醒间隔（秒），不会彻底静音
+        # promptText / userTurnText / nudgeText 可整段替换，支持 {{every}} / {{count}} / {{seconds}} / {{remind}} 占位
 ```
 
 ## 安装
