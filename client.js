@@ -37,7 +37,7 @@ window.__ModuleLoader__.load({
       every: 4,
       maxRemindersPerTurn: 12,
       injectPrompt: true,
-      nudgeOnUserTurn: true,
+      nudgeOnUserTurn: false,
       nudgeOnToolCalls: false,
     }
 

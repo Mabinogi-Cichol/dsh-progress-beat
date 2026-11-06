@@ -11,10 +11,10 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
 | 机制 | 挂载位置 | 作用 | 默认 |
 |---|---|---|---|
 | 进度规则 | `ctx.systemPrompt.section()`（order 4） | 每次请求都带上的常驻规则：预计多次调用时先说计划；进入新阶段时先说 1–2 句进度再继续。 | 开 |
-| 用户轮提醒 | `agent/pre-step` → 该轮 `messages` | 每条用户输入时，随这一轮的消息注入一条提醒——用户每发一句话，模型就重新被要求在执行中途落地说一次。 | 开 |
+| 用户轮提醒 | `agent/pre-step` → 该轮 `messages` | 每条用户输入时，随这一轮的消息注入一条提醒。 | 关 |
 | 工具调用提醒 | `tools/post-execute` → `additionalContexts` | 按工具调用次数计数，每 N 次注入一条。模型想沉默也会被硬提醒一次。 | 关 |
 
-用户轮提醒是默认路径：每个 turn 只在入口 step 注入一次（同一轮的后续 step 不重复），开销是每轮一条。工具调用提醒需要显式打开；关掉时插件在整个工具链阶段不产生任何上下文。
+默认只保留进度规则：两路注入都关闭时，插件只贡献一个 system prompt section，连 `agent/pre-step` 钩子都不注册。打开用户轮提醒后，每个 turn 在入口 step 注入一条（同一轮的后续 step 不重复）；打开工具调用提醒后，另外按次数注入。
 
 三条都不改会话内容、不吞工具结果、不阻塞调用：注入的 notice 走 `source.form = 'notice'`，模型可见、带归属、可审计。
 
@@ -24,7 +24,7 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
 
 | 控件 | 字段 | 说明 |
 |---|---|---|
-| 随用户输入提醒 | `nudgeOnUserTurn` | 每条用户输入时注入一条提醒（默认开） |
+| 随用户输入提醒 | `nudgeOnUserTurn` | 每条用户输入时注入一条提醒（默认关） |
 | 用户轮提醒文本 | `userTurnText` | 随用户输入注入的文本，支持 `{{every}}` |
 | 按工具调用注入 | `nudgeOnToolCalls` | 额外按调用次数注入（默认关） |
 | 节奏预设 | `every` | 一键切换 安静 8 / 标准 4 / 密集 2 |
@@ -50,7 +50,7 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
       name: 'dsh-progress-beat'
       inject: [systemPrompt]
       config:
-        nudgeOnUserTurn: true       # 每条用户输入时注入一条提醒（默认开）
+        nudgeOnUserTurn: false      # 每条用户输入时注入一条提醒（默认关）
         nudgeOnToolCalls: false     # 额外按工具调用次数注入（默认关）
         every: 4                    # nudgeOnToolCalls 开启时，每多少次调用注入一条
         maxRemindersPerTurn: 12     # 每个计数周期最多注入多少条，0 表示关掉这一路

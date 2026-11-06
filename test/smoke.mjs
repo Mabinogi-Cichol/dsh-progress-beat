@@ -22,7 +22,7 @@ const enterNext = async () => ({
 /** tools/post-execute 的下游结果。 */
 const acceptNext = async () => ({ kind: 'accept' })
 
-// ---------------------------------------------------------------- 默认行为
+// --------------------------------------------------- 默认：只有一个 section
 {
   const { ctx, sections, handlers } = makeCtx()
   apply(ctx, {})
@@ -34,11 +34,18 @@ const acceptNext = async () => ({ kind: 'accept' })
   assert.equal(sections[0].order, 4)
   assert.ok(!sections[0].text.includes('{{every}}'), 'placeholder must be filled')
 
-  // 默认不挂工具调用钩子：工具链阶段零上下文。
+  // 两路注入默认都关：连事件钩子都不注册。
   assert.equal(handlers['tools/post-execute'], undefined, 'tool-call nudge must be off by default')
+  assert.equal(handlers['agent/pre-step'], undefined, 'user-turn nudge must be off by default')
+}
+
+// ------------------------------------------------------ 用户轮提醒（显式开启）
+{
+  const { ctx, handlers } = makeCtx()
+  apply(ctx, { nudgeOnUserTurn: true })
 
   const pre = handlers['agent/pre-step'][0]
-  assert.equal(typeof pre, 'function', 'user-turn nudge must be registered by default')
+  assert.equal(typeof pre, 'function', 'user-turn nudge must register when enabled')
 
   const agent = { id: 'agent-a' }
   const payload = { agent, messages: [{ source: { kind: 'user' } }], turn: 1, step: 0 }
@@ -71,7 +78,7 @@ const acceptNext = async () => ({ kind: 'accept' })
 // ------------------------------------------------- 工具调用注入（显式开启）
 {
   const { ctx, handlers } = makeCtx()
-  apply(ctx, { nudgeOnToolCalls: true, nudgeOnUserTurn: false, every: 3, maxRemindersPerTurn: 2 })
+  apply(ctx, { nudgeOnToolCalls: true, every: 3, maxRemindersPerTurn: 2 })
 
   const post = handlers['tools/post-execute'][0]
   assert.equal(typeof post, 'function', 'tool-call nudge must be registered when enabled')
@@ -90,12 +97,13 @@ const acceptNext = async () => ({ kind: 'accept' })
       assert.ok(Object.isFrozen(nudge) && Object.isFrozen(nudge.content))
     }
   }
+  // every=3, cap=2 → 第 3、6 次各注入一次。
   console.log('steps:', sizes.join(','))
   assert.deepEqual(sizes, [0, 0, 1, 0, 0, 1], 'reminder cadence must follow `every`')
 
   // 配额上限。
   const { ctx: ctxCap, handlers: capHandlers } = makeCtx()
-  apply(ctxCap, { nudgeOnToolCalls: true, nudgeOnUserTurn: false, every: 2, maxRemindersPerTurn: 1 })
+  apply(ctxCap, { nudgeOnToolCalls: true, every: 2, maxRemindersPerTurn: 1 })
   const capAgent = { id: 'agent-c' }
   const capSizes = []
   for (let i = 0; i < 4; i += 1) {
@@ -127,23 +135,10 @@ const acceptNext = async () => ({ kind: 'accept' })
   assert.equal(afterReset.additionalContexts, undefined, 'counter must reset on a new user turn')
 }
 
-// ------------------------------------------------------------ 两路都关掉
-{
-  const { ctx, handlers } = makeCtx()
-  apply(ctx, { nudgeOnUserTurn: false, nudgeOnToolCalls: false })
-  assert.equal(handlers['tools/post-execute'], undefined)
-  const pre = handlers['agent/pre-step'][0]
-  const decision = await pre(
-    { agent: { id: 'agent-g' }, messages: [{ source: { kind: 'user' } }], turn: 1, step: 0 },
-    enterNext,
-  )
-  assert.equal(decision.messages.length, 1, 'no context at all when both paths are off')
-}
-
 // ------------------------------------------------------- 自定义文本与占位符
 {
   const { ctx, handlers } = makeCtx()
-  apply(ctx, { userTurnText: '自定义提醒：每 {{every}} 次调用讲一次。', every: 7 })
+  apply(ctx, { nudgeOnUserTurn: true, userTurnText: '自定义提醒：每 {{every}} 次调用讲一次。', every: 7 })
   const pre = handlers['agent/pre-step'][0]
   const decision = await pre(
     { agent: { id: 'agent-h' }, messages: [{ source: { kind: 'user' } }], turn: 1, step: 0 },
