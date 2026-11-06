@@ -1,6 +1,6 @@
 {
   "name": "dsh-progress-beat",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "让 DSH 在长工具链执行中途输出可见进度说明（system prompt 规则 + 步骤级注入提醒 + 控制面板）",
   "keywords": [
     "deepseek",

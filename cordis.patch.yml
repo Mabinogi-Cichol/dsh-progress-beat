@@ -11,7 +11,7 @@
       config:
         # ① 常驻进度规则（system prompt section）
         injectPrompt: true
-        # 规则文本里「每累计约 N 次工具调用」的 N
+        # 规则文本里「每累计约 N 次工具调用」的 N（只影响过程播报，开局门槛不跟它走）
         promptEvery: 6
         # section 排序号：人设 0，其它插件指令 2，工具声明 100 起
         sectionOrder: 4

@@ -26,7 +26,7 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
 | 分组（开关字段） | 组内控件 | 说明 |
 |---|---|---|
 | **常驻进度规则**<br>`injectPrompt` | `promptText` | 规则文本，支持 `{{every}}` |
-| | `promptEvery` | 规则文本里「每累计约 N 次」的 N（2–50，默认 6） |
+| | `promptEvery` | 规则文本里「每累计约 N 次」的 N（2–50，默认 6）。只决定过程播报的节奏，开局的「先说打算怎么做」不跟它走 |
 | | `sectionOrder` | `systemPrompt.section()` 的排序号（默认 4：人设 0、其它插件指令 2、工具声明 100 起） |
 | **用户轮提醒**<br>`nudgeOnUserTurn` | `userTurnText` | 随用户输入注入的文本，支持 `{{every}}` |
 | | `nudgeEveryTurns` | 每几轮提醒一次：1 表示每轮，3 表示每三轮（1–20） |
@@ -56,7 +56,7 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
       config:
         # ① 常驻进度规则（system prompt section）
         injectPrompt: true        # 是否注册常驻规则
-        promptEvery: 6            # 规则文本里「每累计约 N 次」的 N（2–50）
+        promptEvery: 6            # 规则文本里「每累计约 N 次」的 N（2–50，仅影响过程播报）
         sectionOrder: 4           # section 排序号（0–99，默认 4，工具声明在 100 起）
         # ② 用户轮提醒（agent/pre-step）
         nudgeOnUserTurn: false    # 是否随用户输入注入（默认关）
