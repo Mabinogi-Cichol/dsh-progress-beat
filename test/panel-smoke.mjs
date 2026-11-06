@@ -143,6 +143,9 @@ hooks.length = 0
 const page = panel.Component({ view: 'page', t, entryForm: formStub })
 const serialized = JSON.stringify(page)
 const LABEL_KEYS = {
+  nudgeOnUserTurn: 'nudgeOnUserTurnLabel',
+  userTurnText: 'userTurnTextLabel',
+  nudgeOnToolCalls: 'nudgeOnToolCallsLabel',
   every: 'everyLabel',
   maxRemindersPerTurn: 'maxRemindersLabel',
   injectPrompt: 'injectPromptLabel',
@@ -162,4 +165,4 @@ if (failures.length > 0) {
 }
 
 console.log('OK: client.js 冒烟通过')
-console.log(`  id=${loadedId} key=${panel.options.key} fields=5`)
+console.log(`  id=${loadedId} key=${panel.options.key} fields=${Object.keys(LABEL_KEYS).length}`)

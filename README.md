@@ -6,14 +6,17 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
 
 较新的 flash 类模型（如 1017 版本）在 agent 任务里倾向于「连续调用工具、只在最终答复时输出文本」。UI 上就表现为：几十分钟里只有工具卡片在滚，用户不知道模型在干什么。
 
-本插件用两条互补机制把进度说话重新塞回执行过程：
+本插件用三条互补的机制把进度说话重新塞回执行过程：
 
-| 机制 | 挂载位置 | 作用 |
-|---|---|---|
-| 进度规则 | `ctx.systemPrompt.section()`（order 4） | 每次请求都带上的常驻规则：预计多次调用时先说计划；每约 N 次工具调用或进入新阶段，先说 1–2 句进度再继续。 |
-| 兜底提醒 | `tools/post-execute` → `additionalContexts` | 按工具调用次数计数，每 N 次注入一条 `notice`。模型想沉默也会被硬提醒一次，同时会话里留下一条可见的合成消息。 |
+| 机制 | 挂载位置 | 作用 | 默认 |
+|---|---|---|---|
+| 进度规则 | `ctx.systemPrompt.section()`（order 4） | 每次请求都带上的常驻规则：预计多次调用时先说计划；进入新阶段时先说 1–2 句进度再继续。 | 开 |
+| 用户轮提醒 | `agent/pre-step` → 该轮 `messages` | 每条用户输入时，随这一轮的消息注入一条提醒——用户每发一句话，模型就重新被要求在执行中途落地说一次。 | 开 |
+| 工具调用提醒 | `tools/post-execute` → `additionalContexts` | 按工具调用次数计数，每 N 次注入一条。模型想沉默也会被硬提醒一次。 | 关 |
 
-两条都不改会话内容、不吞工具结果、不阻塞调用：注入的 notice 走 `source.form = 'notice'`，模型可见、带归属、可审计。
+用户轮提醒是默认路径：每个 turn 只在入口 step 注入一次（同一轮的后续 step 不重复），开销是每轮一条。工具调用提醒需要显式打开；关掉时插件在整个工具链阶段不产生任何上下文。
+
+三条都不改会话内容、不吞工具结果、不阻塞调用：注入的 notice 走 `source.form = 'notice'`，模型可见、带归属、可审计。
 
 ## 控制面板
 
@@ -21,12 +24,15 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
 
 | 控件 | 字段 | 说明 |
 |---|---|---|
+| 随用户输入提醒 | `nudgeOnUserTurn` | 每条用户输入时注入一条提醒（默认开） |
+| 用户轮提醒文本 | `userTurnText` | 随用户输入注入的文本，支持 `{{every}}` |
+| 按工具调用注入 | `nudgeOnToolCalls` | 额外按调用次数注入（默认关） |
 | 节奏预设 | `every` | 一键切换 安静 8 / 标准 4 / 密集 2 |
-| 播报步频 | `every` | 累计多少次工具调用后强制播报（2–50） |
-| 单轮提醒上限 | `maxRemindersPerTurn` | 每个清零周期内最多注入多少条兜底提醒；0 表示关掉兜底 |
+| 播报步频 | `every` | 每多少次工具调用注入一条（2–50，仅上面开关开启时生效） |
+| 单轮提醒上限 | `maxRemindersPerTurn` | 每个计数周期内最多注入多少条；0 表示关掉这一路 |
 | 常驻进度规则 | `injectPrompt` | 是否注册 system prompt 规则 |
 | 常驻规则文本 | `promptText` | 支持 `{{every}}` 占位符 |
-| 兜底提醒文本 | `nudgeText` | 支持 `{{every}}` / `{{count}}` 占位符 |
+| 工具调用提醒文本 | `nudgeText` | 支持 `{{every}}` / `{{count}}` 占位符 |
 
 面板是「暂存 + 保存」模型：改动先留在表单里，点**保存**才写入；每个字段可单独**重置**回默认，也可以**全部重置**。字段旁出现「已覆盖」徽标表示它被用户改过、不再跟随默认值。
 
@@ -44,10 +50,12 @@ DeepSeek Harness（DSH）插件：**让 agent 在长时间「思考 + 工具调�
       name: 'dsh-progress-beat'
       inject: [systemPrompt]
       config:
-        every: 4                    # 累计多少次工具调用后强制播报（>=2）
-        maxRemindersPerTurn: 12     # 单轮最多注入多少次提醒，防刷屏 / 刷 token
+        nudgeOnUserTurn: true       # 每条用户输入时注入一条提醒（默认开）
+        nudgeOnToolCalls: false     # 额外按工具调用次数注入（默认关）
+        every: 4                    # nudgeOnToolCalls 开启时，每多少次调用注入一条
+        maxRemindersPerTurn: 12     # 每个计数周期最多注入多少条，0 表示关掉这一路
         injectPrompt: true          # 是否注册 system prompt 规则
-        # promptText / nudgeText 可整段替换，支持 {{every}} / {{count}} 占位
+        # promptText / userTurnText / nudgeText 可整段替换，支持 {{every}} / {{count}} 占位
 ```
 
 ## 安装
